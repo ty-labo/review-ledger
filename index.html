@@ -1,1 +1,701 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1, viewport-fit=cover">
+<title>購入レビュー帳</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper: #F6F1E4;
+    --paper-line: #E4DBC4;
+    --ink: #1E2A33;
+    --ink-soft: #55606A;
+    --seal: #A6362C;
+    --seal-dark: #7E271F;
+    --gold: #B9922F;
+    --profit: #2E6B4F;
+    --loss: #A6362C;
+    --card: #FFFDF7;
+    --radius: 14px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{margin:0; padding:0; background:var(--paper); color:var(--ink); font-family:'Zen Kaku Gothic New', 'Hiragino Sans', sans-serif; -webkit-font-smoothing:antialiased; overflow-x:hidden; width:100%;}
+  body{
+    padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    min-height:100vh;
+    background-image:
+      repeating-linear-gradient(0deg, transparent, transparent 39px, var(--paper-line) 40px);
+  }
+  .display{font-family:'Shippori Mincho', serif;}
 
+  header.top{
+    position:sticky; top:0; z-index:20;
+    background:var(--paper);
+    padding: calc(18px + env(safe-area-inset-top)) 20px 14px;
+    border-bottom:1px solid var(--paper-line);
+  }
+  header.top h1{
+    font-family:'Shippori Mincho', serif;
+    font-weight:800;
+    font-size:22px;
+    margin:0;
+    letter-spacing:.04em;
+    color:var(--ink);
+    display:flex; align-items:baseline; gap:8px;
+  }
+  header.top h1 .sub{font-family:'Zen Kaku Gothic New',sans-serif; font-weight:500; font-size:11px; color:var(--ink-soft); letter-spacing:.08em;}
+
+  main{padding:16px 16px 8px; max-width:640px; margin:0 auto;}
+  .view{display:none;}
+  .view.active{display:block; animation:fadeIn .25s ease;}
+  @keyframes fadeIn{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+
+  /* ---- form ---- */
+  .card{
+    background:var(--card);
+    border:1px solid var(--paper-line);
+    border-radius:var(--radius);
+    padding:18px;
+    box-shadow:0 1px 2px rgba(30,42,51,.04);
+  }
+  .card + .card{margin-top:14px;}
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block; font-size:12px; font-weight:700; color:var(--ink-soft);
+    letter-spacing:.03em; margin-bottom:6px;
+  }
+  .field .req{color:var(--seal); margin-left:2px;}
+  .row2{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px;}
+  .row3{display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px;}
+  .row2 > *, .row3 > *, .stat-grid > *, .list-toolbar > *{min-width:0;}
+  input[type=text], input[type=date], input[type=number], select, textarea{
+    box-sizing:border-box;
+    width:100%; max-width:100%; padding:11px 12px; border:1px solid #D8CFB6; border-radius:9px;
+    background:#fff; font-size:16px; font-family:inherit; color:var(--ink);
+  }
+  input[type=text], select{
+    -webkit-appearance:none; -moz-appearance:none; appearance:none;
+  }
+  input[type=number]{-moz-appearance:textfield;}
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none; margin:0;}
+  input:focus, select:focus, textarea:focus{outline:2px solid var(--gold); outline-offset:1px; border-color:var(--gold);}
+  select{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0L5 6L10 0Z' fill='%2355606A'/></svg>"); background-repeat:no-repeat; background-position:right 12px center; padding-right:30px;}
+  textarea{resize:vertical; min-height:56px;}
+
+
+  .compute-strip{
+    display:flex; justify-content:space-between; align-items:center;
+    background:#FBF6E9; border:1px dashed var(--gold); border-radius:9px;
+    padding:12px 14px; margin:16px 0 6px;
+  }
+  .compute-strip .label{font-size:12px; color:var(--ink-soft); font-weight:700;}
+  .compute-strip .value{font-family:'Shippori Mincho',serif; font-size:22px; font-weight:800;}
+  .value.pos{color:var(--profit);} .value.neg{color:var(--loss);}
+
+  .subsection{
+    border-radius:11px; padding:14px 14px 4px; margin:18px 0 4px;
+    border-left:4px solid var(--ink);
+  }
+  .subsection-buy{background:#EEF0F3;}
+  .subsection-buy .subsection-title{color:var(--ink);}
+  .subsection-resale{background:#FBF3E0; border-left-color:var(--gold);}
+  .subsection-resale .subsection-title{color:var(--seal-dark);}
+  .subsection-title{
+    font-family:'Shippori Mincho', serif; font-weight:800; font-size:13px;
+    letter-spacing:.1em; margin-bottom:12px;
+  }
+
+  .btn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    padding:13px 18px; border-radius:10px; border:none; font-size:15px; font-weight:700;
+    font-family:'Zen Kaku Gothic New',sans-serif; cursor:pointer; letter-spacing:.02em;
+    -webkit-user-select:none; user-select:none;
+  }
+  .btn-primary{background:var(--ink); color:#F6F1E4; width:100%; padding:14px;}
+  .btn-primary:active{background:#0f171d;}
+  .btn-ghost{background:transparent; color:var(--ink-soft); border:1px solid #D8CFB6;}
+  .btn-danger{background:transparent; color:var(--seal); border:1px solid #E3B3AC;}
+  .btn-row{display:flex; gap:10px; margin-top:16px;}
+  .btn-row .btn{flex:1;}
+
+  /* ---- list ---- */
+  .list-toolbar{display:flex; gap:8px; margin-bottom:12px;}
+  .list-toolbar select{flex:1;}
+  .deal{
+    background:var(--card); border:1px solid var(--paper-line); border-radius:12px;
+    padding:14px 14px; margin-bottom:10px; position:relative;
+    transition:background .2s, border-color .2s;
+  }
+  .deal.complete{
+    background:#EDE7D4; border-color:#CDBE97;
+  }
+  .deal .site-tag{
+    display:inline-block; font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px;
+    background:#EFE7CF; color:#7A6420; margin-bottom:6px;
+  }
+  .deal .project-tag{
+    display:inline-block; font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px;
+    background:#E3E8ED; color:#3C4C5A; margin-bottom:6px; margin-right:6px;
+  }
+  .deal .done-tag{
+    display:inline-block; font-size:11px; font-weight:700; padding:2px 9px; border-radius:20px;
+    background:#DCEAE0; color:var(--profit); margin-bottom:6px; margin-left:6px;
+  }
+  .deal .dates{font-size:12px; color:var(--ink-soft); margin-bottom:8px;}
+  .deal .name{font-weight:700; font-size:15px; margin-bottom:2px;}
+  .deal .nums{display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12.5px; color:var(--ink-soft); margin-top:8px;}
+  .deal .nums b{color:var(--ink); font-weight:700;}
+  .deal .profit-badge{
+    position:absolute; top:14px; right:14px; text-align:right;
+    font-family:'Shippori Mincho',serif; font-weight:800; font-size:18px;
+  }
+  .empty{
+    text-align:center; padding:50px 20px; color:var(--ink-soft);
+  }
+  .empty .glyph{font-size:34px; margin-bottom:10px; opacity:.5;}
+
+  /* ---- summary ---- */
+  .stat-grid{display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; margin-bottom:14px;}
+  .stat{
+    background:var(--card); border:1px solid var(--paper-line); border-radius:12px; padding:14px;
+  }
+  .stat .lbl{font-size:11.5px; color:var(--ink-soft); font-weight:700; margin-bottom:4px;}
+  .stat .num{font-family:'Shippori Mincho',serif; font-size:21px; font-weight:800;}
+
+  .seal-wrap{display:flex; justify-content:center; margin:26px 0 22px;}
+  .seal{
+    width:132px; height:132px; border-radius:50%;
+    border:3px double var(--seal);
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    color:var(--seal); transform:rotate(-6deg);
+    box-shadow:0 0 0 1px rgba(166,54,44,.15) inset;
+    position:relative;
+    mix-blend-mode:multiply;
+  }
+  .seal::before{
+    content:''; position:absolute; inset:6px; border:1px solid var(--seal); border-radius:50%; opacity:.55;
+  }
+  .seal .sc-label{font-family:'Shippori Mincho',serif; font-size:12px; font-weight:700; letter-spacing:.15em;}
+  .seal .sc-num{font-family:'Shippori Mincho',serif; font-size:20px; font-weight:800; margin-top:2px;}
+
+  .month-row{
+    display:flex; align-items:center; gap:10px; padding:10px 0; border-bottom:1px solid var(--paper-line);
+  }
+  .month-row:last-child{border-bottom:none;}
+  .month-row .m{width:56px; font-size:13px; font-weight:700; color:var(--ink-soft);}
+  .month-row .bar-bg{flex:1; height:8px; background:#EDE6D3; border-radius:5px; overflow:hidden;}
+  .month-row .bar{height:100%; background:var(--gold); border-radius:5px;}
+  .month-row .v{width:74px; text-align:right; font-size:13px; font-weight:700;}
+
+  /* ---- tabs ---- */
+  nav.tabs{
+    position:fixed; bottom:0; left:0; right:0; z-index:30;
+    background:var(--card); border-top:1px solid var(--paper-line);
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    display:flex; gap:4px;
+  }
+  nav.tabs button{
+    flex:1; background:none; border:none; padding:8px 4px; font-family:'Zen Kaku Gothic New',sans-serif;
+    font-size:11.5px; font-weight:700; color:var(--ink-soft); border-radius:10px;
+    display:flex; flex-direction:column; align-items:center; gap:4px; cursor:pointer;
+  }
+  nav.tabs button.active{color:var(--seal); background:#FBF0EC;}
+  nav.tabs svg{width:20px; height:20px;}
+
+  .toast{
+    position:fixed; left:50%; bottom:90px; transform:translateX(-50%) translateY(20px);
+    background:var(--ink); color:#F6F1E4; padding:10px 18px; border-radius:20px; font-size:13px;
+    opacity:0; transition:opacity .25s, transform .25s; pointer-events:none; z-index:50; white-space:nowrap;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+
+  ::selection{background:#EFD8A6;}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>購入レビュー帳<span class="sub">PURCHASE &amp; RESALE LEDGER</span></h1>
+</header>
+
+<main>
+
+  <!-- 入力 -->
+  <section id="view-input" class="view active">
+    <div class="card">
+      <div class="field">
+        <label>商品名・メモ</label>
+        <input type="text" id="f-name" placeholder="例）プロテイン、猫用爪とぎ">
+      </div>
+
+      <div class="field">
+        <label>案内日</label>
+        <input type="date" id="f-notice">
+      </div>
+      <div class="field">
+        <label>購入日</label>
+        <input type="date" id="f-buy">
+      </div>
+      <div class="field">
+        <label>到着日</label>
+        <input type="date" id="f-arrive">
+      </div>
+
+      <div class="subsection subsection-buy">
+        <div class="subsection-title">購入パート</div>
+        <div class="field">
+          <label>案件サイト</label>
+          <select id="f-project-site">
+            <option value="">未定・なし</option>
+            <option>モニレポ</option>
+            <option>egift</option>
+            <option>アマレポ</option>
+            <option>スキマ</option>
+            <option>ギフサポ</option>
+            <option>コエくる</option>
+            <option>Facebook案件</option>
+          </select>
+        </div>
+        <div class="row2">
+          <div class="field">
+            <label>当初販売提示額</label>
+            <input type="number" id="f-list" inputmode="numeric" placeholder="円">
+          </div>
+          <div class="field">
+            <label>実質販売額</label>
+            <input type="number" id="f-actual" inputmode="numeric" placeholder="円">
+          </div>
+        </div>
+      </div>
+
+      <div class="subsection subsection-resale">
+        <div class="subsection-title">転売パート</div>
+        <div class="field">
+          <label>転売サイト</label>
+          <select id="f-site">
+            <option value="">未定・なし</option>
+            <option>メルカリ</option>
+            <option>Yahooフリマ</option>
+            <option>ラクマ</option>
+            <option>その他</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>転売益</label>
+          <input type="number" id="f-resale" inputmode="numeric" placeholder="円">
+        </div>
+        <div class="field" style="margin-bottom:4px;">
+          <label>諸経費の内訳</label>
+          <div class="row3">
+            <div>
+              <label style="font-weight:500; font-size:11px;">手数料</label>
+              <input type="number" id="f-commission" inputmode="numeric" placeholder="円">
+            </div>
+            <div>
+              <label style="font-weight:500; font-size:11px;">送料</label>
+              <input type="number" id="f-shipping" inputmode="numeric" placeholder="円">
+            </div>
+            <div>
+              <label style="font-weight:500; font-size:11px;">梱包費</label>
+              <input type="number" id="f-packing" inputmode="numeric" placeholder="円">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:16px;">
+        <label>レビュー報酬</label>
+        <input type="number" id="f-reward" inputmode="numeric" placeholder="円">
+      </div>
+
+      <div class="compute-strip">
+        <span class="label">総利益額（転売益 + 報酬 − 手数料 − 送料 − 梱包費）</span>
+        <span class="value" id="f-total">¥0</span>
+      </div>
+
+      <div class="field" style="margin-top:14px;">
+        <label>備考</label>
+        <textarea id="f-note" placeholder="任意"></textarea>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-ghost" id="btn-clear" type="button">クリア</button>
+        <button class="btn btn-primary" id="btn-save" type="button" style="flex:2;">記録する</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 一覧 -->
+  <section id="view-list" class="view">
+    <div class="list-toolbar">
+      <select id="list-filter-project">
+        <option value="all">すべての案件サイト</option>
+        <option>モニレポ</option>
+        <option>egift</option>
+        <option>アマレポ</option>
+        <option>スキマ</option>
+        <option>ギフサポ</option>
+        <option>コエくる</option>
+        <option>Facebook案件</option>
+      </select>
+      <select id="list-filter">
+        <option value="all">すべての転売サイト</option>
+        <option>メルカリ</option>
+        <option>Yahooフリマ</option>
+        <option>ラクマ</option>
+        <option>その他</option>
+      </select>
+    </div>
+    <div class="list-toolbar">
+      <select id="list-sort">
+        <option value="buy-desc">購入日が新しい順</option>
+        <option value="buy-asc">購入日が古い順</option>
+        <option value="profit-desc">利益が多い順</option>
+      </select>
+    </div>
+    <div id="list-container"></div>
+  </section>
+
+  <!-- 集計 -->
+  <section id="view-summary" class="view">
+    <div class="stat-grid">
+      <div class="stat"><div class="lbl">案件数</div><div class="num" id="s-count">0件</div></div>
+      <div class="stat"><div class="lbl">転売益 合計</div><div class="num" id="s-resale">¥0</div></div>
+      <div class="stat"><div class="lbl">レビュー報酬 合計</div><div class="num" id="s-reward">¥0</div></div>
+      <div class="stat"><div class="lbl">手数料 合計</div><div class="num" id="s-commission">¥0</div></div>
+      <div class="stat"><div class="lbl">送料 合計</div><div class="num" id="s-shipping">¥0</div></div>
+      <div class="stat"><div class="lbl">梱包費 合計</div><div class="num" id="s-packing">¥0</div></div>
+    </div>
+
+    <div class="seal-wrap">
+      <div class="seal">
+        <div class="sc-label">総 利 益</div>
+        <div class="sc-num" id="s-total">¥0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="field" style="margin-bottom:8px;"><label style="margin-bottom:2px;">月別の総利益額</label></div>
+      <div id="month-breakdown"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-ghost" id="btn-export" type="button" style="flex:1;">表計算用にコピー</button>
+    </div>
+  </section>
+
+</main>
+
+<nav class="tabs">
+  <button data-view="input" class="active">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20l3.5-1 10-10-2.5-2.5-10 10L4 20z"/><path d="M14 6l2.5 2.5"/></svg>
+    記録
+  </button>
+  <button data-view="list">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+    一覧
+  </button>
+  <button data-view="summary">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M5 19V9M12 19V5M19 19v-7"/></svg>
+    集計
+  </button>
+</nav>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  let deals = [];
+  let editingId = null;
+
+  const $ = id => document.getElementById(id);
+  const yen = n => '¥' + Math.round(n||0).toLocaleString('ja-JP');
+
+  function toast(msg){
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(toast._h);
+    toast._h = setTimeout(()=>t.classList.remove('show'), 1800);
+  }
+
+  // ---------- storage (localStorage: data stays on this device/browser only) ----------
+  const LS_KEY = 'review-ledger-deals-v1';
+  async function loadDeals(){
+    try{
+      const raw = localStorage.getItem(LS_KEY);
+      deals = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      deals = [];
+    }
+    renderAll();
+  }
+  async function saveDeals(){
+    try{
+      localStorage.setItem(LS_KEY, JSON.stringify(deals));
+    }catch(e){
+      toast('保存に失敗しました（ストレージの空き容量をご確認ください）');
+    }
+  }
+
+  // ---------- tabs ----------
+  document.querySelectorAll('nav.tabs button').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      $('view-'+btn.dataset.view).classList.add('active');
+      if(btn.dataset.view === 'list') renderList();
+      if(btn.dataset.view === 'summary') renderSummary();
+    });
+  });
+
+  function goToInput(){
+    document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
+    document.querySelector('nav.tabs button[data-view="input"]').classList.add('active');
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    $('view-input').classList.add('active');
+  }
+
+  // ---------- form compute ----------
+  const numIds = ['f-commission','f-shipping','f-packing','f-resale','f-reward'];
+  function computeTotal(){
+    const commission = parseFloat($('f-commission').value)||0;
+    const shipping = parseFloat($('f-shipping').value)||0;
+    const packing = parseFloat($('f-packing').value)||0;
+    const resale = parseFloat($('f-resale').value)||0;
+    const reward = parseFloat($('f-reward').value)||0;
+    const total = resale + reward - commission - shipping - packing;
+    const el = $('f-total');
+    el.textContent = yen(total);
+    el.className = 'value ' + (total >= 0 ? 'pos':'neg');
+    return total;
+  }
+  numIds.forEach(id => $(id).addEventListener('input', computeTotal));
+
+  function clearForm(){
+    ['f-name','f-notice','f-buy','f-arrive','f-list','f-actual','f-commission','f-shipping','f-packing','f-resale','f-reward','f-note'].forEach(id=> $(id).value='');
+    $('f-site').value='';
+    $('f-project-site').value='';
+    editingId = null;
+    $('btn-save').textContent = '記録する';
+    computeTotal();
+  }
+  $('btn-clear').addEventListener('click', clearForm);
+
+  $('btn-save').addEventListener('click', async ()=>{
+    const deal = {
+      id: editingId || (Date.now()+'-'+Math.random().toString(36).slice(2,7)),
+      name: $('f-name').value.trim(),
+      notice: $('f-notice').value,
+      buy: $('f-buy').value,
+      arrive: $('f-arrive').value,
+      site: $('f-site').value,
+      projectSite: $('f-project-site').value,
+      list: $('f-list').value,
+      actual: $('f-actual').value,
+      commission: $('f-commission').value,
+      shipping: $('f-shipping').value,
+      packing: $('f-packing').value,
+      resale: $('f-resale').value,
+      reward: $('f-reward').value,
+      note: $('f-note').value.trim(),
+    };
+    if(!deal.buy && !deal.notice && !deal.name){
+      toast('購入日か商品名を入力してください');
+      return;
+    }
+    if(editingId){
+      const idx = deals.findIndex(d=>d.id===editingId);
+      if(idx>-1) deals[idx] = deal;
+    } else {
+      deals.push(deal);
+    }
+    await saveDeals();
+    toast(editingId ? '更新しました' : '記録しました');
+    clearForm();
+    renderList();
+    renderSummary();
+  });
+
+  // ---------- list ----------
+  function dealTotal(d){
+    const commission = parseFloat(d.commission)||0;
+    const shipping = parseFloat(d.shipping)||0;
+    const packing = parseFloat(d.packing)||0;
+    const resale = parseFloat(d.resale)||0;
+    const reward = parseFloat(d.reward)||0;
+    return resale + reward - commission - shipping - packing;
+  }
+
+  function isComplete(d){
+    const req = [d.buy, d.projectSite, d.site, d.list, d.actual, d.commission, d.shipping, d.packing, d.resale, d.reward];
+    return req.every(v => v !== '' && v !== undefined && v !== null);
+  }
+
+  function renderList(){
+    const filter = $('list-filter').value;
+    const filterProject = $('list-filter-project').value;
+    const sort = $('list-sort').value;
+    let items = deals.slice();
+    if(filter !== 'all') items = items.filter(d => d.site === filter);
+    if(filterProject !== 'all') items = items.filter(d => d.projectSite === filterProject);
+
+    items.sort((a,b)=>{
+      if(sort === 'buy-asc') return (a.buy||'').localeCompare(b.buy||'');
+      if(sort === 'profit-desc') return dealTotal(b) - dealTotal(a);
+      return (b.buy||'').localeCompare(a.buy||'');
+    });
+
+    const c = $('list-container');
+    if(items.length===0){
+      c.innerHTML = '<div class="empty"><div class="glyph">帳</div>まだ記録がありません<br>「記録」タブから追加しましょう</div>';
+      return;
+    }
+
+    c.innerHTML = items.map(d=>{
+      const total = dealTotal(d);
+      const cls = total >= 0 ? 'pos' : 'neg';
+      const color = total >= 0 ? 'var(--profit)' : 'var(--loss)';
+      const complete = isComplete(d);
+      const dates = [d.notice && ('案内 '+fmtDate(d.notice)), d.buy && ('購入 '+fmtDate(d.buy)), d.arrive && ('到着 '+fmtDate(d.arrive))].filter(Boolean).join(' ・ ');
+      return `<div class="deal${complete ? ' complete':''}" data-id="${d.id}">
+        ${d.projectSite ? `<span class="project-tag">${d.projectSite}</span>` : ''}
+        ${d.site ? `<span class="site-tag">${d.site}</span>` : ''}
+        ${complete ? `<span class="done-tag">完了</span>` : ''}
+        <div class="name">${d.name || '（商品名未入力）'}</div>
+        <div class="dates">${dates || '日付未入力'}</div>
+        <div class="profit-badge" style="color:${color};">${yen(total)}</div>
+        <div class="nums">
+          ${d.list ? `<span>提示額 <b>${yen(d.list)}</b></span>`:''}
+          ${d.actual ? `<span>実質額 <b>${yen(d.actual)}</b></span>`:''}
+          ${d.commission ? `<span>手数料 <b>${yen(d.commission)}</b></span>`:''}
+          ${d.shipping ? `<span>送料 <b>${yen(d.shipping)}</b></span>`:''}
+          ${d.packing ? `<span>梱包費 <b>${yen(d.packing)}</b></span>`:''}
+          ${d.resale ? `<span>転売益 <b>${yen(d.resale)}</b></span>`:''}
+          ${d.reward ? `<span>報酬 <b>${yen(d.reward)}</b></span>`:''}
+        </div>
+      </div>`;
+    }).join('');
+
+    c.querySelectorAll('.deal').forEach(el=>{
+      el.addEventListener('click', ()=> openEdit(el.dataset.id));
+    });
+  }
+
+  function fmtDate(s){
+    if(!s) return '';
+    const [y,m,d] = s.split('-');
+    return `${parseInt(m)}/${parseInt(d)}`;
+  }
+
+  function openEdit(id){
+    const d = deals.find(x=>x.id===id);
+    if(!d) return;
+    editingId = id;
+    $('f-name').value = d.name||'';
+    $('f-notice').value = d.notice||'';
+    $('f-buy').value = d.buy||'';
+    $('f-arrive').value = d.arrive||'';
+    $('f-site').value = d.site||'';
+    $('f-project-site').value = d.projectSite||'';
+    $('f-list').value = d.list||'';
+    $('f-actual').value = d.actual||'';
+    $('f-commission').value = d.commission||'';
+    $('f-shipping').value = d.shipping||'';
+    $('f-packing').value = d.packing||'';
+    $('f-resale').value = d.resale||'';
+    $('f-reward').value = d.reward||'';
+    $('f-note').value = d.note||'';
+    computeTotal();
+    $('btn-save').textContent = '更新する';
+    goToInput();
+
+    // add delete option once
+    if(!$('btn-delete')){
+      const b = document.createElement('button');
+      b.id='btn-delete'; b.type='button'; b.className='btn btn-danger';
+      b.textContent='削除';
+      b.style.width='100%'; b.style.marginTop='10px';
+      b.addEventListener('click', async ()=>{
+        if(confirm('この記録を削除しますか？')){
+          deals = deals.filter(x=>x.id!==editingId);
+          await saveDeals();
+          toast('削除しました');
+          clearForm();
+          b.remove();
+          renderList(); renderSummary();
+        }
+      });
+      $('view-input').querySelector('.card').appendChild(b);
+    }
+  }
+
+  $('list-filter').addEventListener('change', renderList);
+  $('list-filter-project').addEventListener('change', renderList);
+  $('list-sort').addEventListener('change', renderList);
+
+  // ---------- summary ----------
+  function renderSummary(){
+    let commission=0, shipping=0, packing=0, resale=0, reward=0, total=0;
+    const byMonth = {};
+    deals.forEach(d=>{
+      const c = parseFloat(d.commission)||0, s = parseFloat(d.shipping)||0, p = parseFloat(d.packing)||0;
+      const r = parseFloat(d.resale)||0, rw = parseFloat(d.reward)||0;
+      commission += c; shipping += s; packing += p; resale += r; reward += rw;
+      total += (r+rw-c-s-p);
+      const key = (d.buy || d.notice || '').slice(0,7);
+      if(key){
+        byMonth[key] = (byMonth[key]||0) + (r+rw-c-s-p);
+      }
+    });
+    $('s-count').textContent = deals.length + '件';
+    $('s-commission').textContent = yen(commission);
+    $('s-shipping').textContent = yen(shipping);
+    $('s-packing').textContent = yen(packing);
+    $('s-resale').textContent = yen(resale);
+    $('s-reward').textContent = yen(reward);
+    $('s-total').textContent = yen(total);
+
+    const months = Object.keys(byMonth).sort();
+    const maxAbs = Math.max(1, ...months.map(m=>Math.abs(byMonth[m])));
+    $('month-breakdown').innerHTML = months.length ? months.map(m=>{
+      const v = byMonth[m];
+      const pct = Math.max(4, Math.round(Math.abs(v)/maxAbs*100));
+      const label = m.replace('-','年')+'月';
+      return `<div class="month-row">
+        <div class="m">${label}</div>
+        <div class="bar-bg"><div class="bar" style="width:${pct}%; background:${v>=0?'var(--gold)':'var(--loss)'}"></div></div>
+        <div class="v" style="color:${v>=0?'var(--profit)':'var(--loss)'}">${yen(v)}</div>
+      </div>`;
+    }).join('') : '<div style="color:var(--ink-soft); font-size:13px; padding:6px 0;">データがありません</div>';
+  }
+
+  $('btn-export').addEventListener('click', async ()=>{
+    const header = ['商品名','案内日','購入日','到着日','案件サイト','転売サイト','当初提示額','実質販売額','手数料','送料','梱包費','転売益','レビュー報酬','総利益額','備考'].join('\t');
+    const rows = deals.map(d=>[
+      d.name, d.notice, d.buy, d.arrive, d.projectSite, d.site, d.list, d.actual, d.commission, d.shipping, d.packing, d.resale, d.reward, dealTotal(d), d.note
+    ].join('\t'));
+    const text = [header, ...rows].join('\n');
+    try{
+      await navigator.clipboard.writeText(text);
+      toast('コピーしました。スプレッドシートに貼り付けできます');
+    }catch(e){
+      toast('コピーに失敗しました');
+    }
+  });
+
+  function renderAll(){
+    computeTotal();
+    renderList();
+    renderSummary();
+  }
+
+  loadDeals();
+})();
+</script>
+</body>
+</html>
