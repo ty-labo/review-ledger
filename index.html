@@ -91,12 +91,6 @@
     background:#FBF6E9; border:1px dashed var(--gold); border-radius:9px;
     padding:12px 14px; margin:16px 0 6px;
   }
-  .warn{
-    background:#FBEEEA; border:1px solid #E3B3AC; border-radius:12px;
-    padding:14px 16px; margin-bottom:16px; color:var(--seal-dark);
-  }
-  .warn-title{font-weight:700; margin-bottom:4px; font-size:14px;}
-  .warn p{margin:0; font-size:13px; line-height:1.5;}
   .compute-strip .label{font-size:12px; color:var(--ink-soft); font-weight:700;}
   .compute-strip .value{font-family:'Shippori Mincho',serif; font-size:22px; font-weight:800;}
   .value.pos{color:var(--profit);} .value.neg{color:var(--loss);}
@@ -336,9 +330,6 @@
 
   <!-- 一覧 -->
   <section id="view-list" class="view">
-    <div class="field" style="margin-bottom:10px;">
-      <input type="text" id="list-search" placeholder="商品名・メモで検索">
-    </div>
     <div class="list-toolbar">
       <select id="list-filter-project">
         <option value="all">すべての案件サイト</option>
@@ -363,7 +354,6 @@
         <option value="buy-desc">購入日が新しい順</option>
         <option value="buy-asc">購入日が古い順</option>
         <option value="profit-desc">利益が多い順</option>
-        <option value="incomplete-first">未完了を先に表示</option>
       </select>
     </div>
     <div id="list-container"></div>
@@ -371,8 +361,6 @@
 
   <!-- 集計 -->
   <section id="view-summary" class="view">
-    <div id="backup-banner" class="warn" style="display:none;"></div>
-
     <div class="stat-grid">
       <div class="stat"><div class="lbl">案件数</div><div class="num" id="s-count">0件</div></div>
       <div class="stat"><div class="lbl">転売益 合計</div><div class="num" id="s-resale">¥0</div></div>
@@ -396,19 +384,6 @@
 
     <div class="btn-row">
       <button class="btn btn-ghost" id="btn-export" type="button" style="flex:1;">表計算用にコピー</button>
-    </div>
-    <div id="backup-status" style="text-align:center; font-size:11.5px; color:var(--ink-soft); margin-top:8px;"></div>
-
-    <div class="card" style="margin-top:20px;">
-      <button type="button" id="btn-toggle-settings" style="background:none; border:none; padding:0; width:100%; text-align:left; display:flex; justify-content:space-between; align-items:center; cursor:pointer;">
-        <span class="subsection-title" style="margin-bottom:0;">完了条件の設定</span>
-        <span id="settings-caret" style="color:var(--ink-soft); font-size:12px;">▼</span>
-      </button>
-      <div id="settings-panel" style="display:none; margin-top:12px;">
-        <p style="font-size:12px; color:var(--ink-soft); margin:0 0 10px;">一覧で「完了」タグを表示する条件（入力必須にする項目）を選べます。</p>
-        <div id="settings-checks"></div>
-        <button class="btn btn-primary" id="btn-save-settings" type="button" style="margin-top:14px;">この条件で保存</button>
-      </div>
     </div>
   </section>
 
@@ -481,4 +456,246 @@
   function goToInput(){
     document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.remove('active'));
     document.querySelector('nav.tabs button[data-view="input"]').classList.add('active');
-    document.querySelectorAll('.view').forEach(v=>v.classList.
+    document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+    $('view-input').classList.add('active');
+  }
+
+  // ---------- form compute ----------
+  const numIds = ['f-commission','f-shipping','f-packing','f-resale','f-reward'];
+  function computeTotal(){
+    const commission = parseFloat($('f-commission').value)||0;
+    const shipping = parseFloat($('f-shipping').value)||0;
+    const packing = parseFloat($('f-packing').value)||0;
+    const resale = parseFloat($('f-resale').value)||0;
+    const reward = parseFloat($('f-reward').value)||0;
+    const total = resale + reward - commission - shipping - packing;
+    const el = $('f-total');
+    el.textContent = yen(total);
+    el.className = 'value ' + (total >= 0 ? 'pos':'neg');
+    return total;
+  }
+  numIds.forEach(id => $(id).addEventListener('input', computeTotal));
+
+  function clearForm(){
+    ['f-name','f-notice','f-buy','f-arrive','f-list','f-actual','f-commission','f-shipping','f-packing','f-resale','f-reward','f-note'].forEach(id=> $(id).value='');
+    $('f-site').value='';
+    $('f-project-site').value='';
+    editingId = null;
+    $('btn-save').textContent = '記録する';
+    computeTotal();
+  }
+  $('btn-clear').addEventListener('click', clearForm);
+
+  $('btn-save').addEventListener('click', async ()=>{
+    const deal = {
+      id: editingId || (Date.now()+'-'+Math.random().toString(36).slice(2,7)),
+      name: $('f-name').value.trim(),
+      notice: $('f-notice').value,
+      buy: $('f-buy').value,
+      arrive: $('f-arrive').value,
+      site: $('f-site').value,
+      projectSite: $('f-project-site').value,
+      list: $('f-list').value,
+      actual: $('f-actual').value,
+      commission: $('f-commission').value,
+      shipping: $('f-shipping').value,
+      packing: $('f-packing').value,
+      resale: $('f-resale').value,
+      reward: $('f-reward').value,
+      note: $('f-note').value.trim(),
+    };
+    if(!deal.buy && !deal.notice && !deal.name){
+      toast('購入日か商品名を入力してください');
+      return;
+    }
+    if(editingId){
+      const idx = deals.findIndex(d=>d.id===editingId);
+      if(idx>-1) deals[idx] = deal;
+    } else {
+      deals.push(deal);
+    }
+    await saveDeals();
+    toast(editingId ? '更新しました' : '記録しました');
+    clearForm();
+    renderList();
+    renderSummary();
+  });
+
+  // ---------- list ----------
+  function dealTotal(d){
+    const commission = parseFloat(d.commission)||0;
+    const shipping = parseFloat(d.shipping)||0;
+    const packing = parseFloat(d.packing)||0;
+    const resale = parseFloat(d.resale)||0;
+    const reward = parseFloat(d.reward)||0;
+    return resale + reward - commission - shipping - packing;
+  }
+
+  function isComplete(d){
+    const req = [d.buy, d.projectSite, d.site, d.list, d.actual, d.commission, d.shipping, d.packing, d.resale, d.reward];
+    return req.every(v => v !== '' && v !== undefined && v !== null);
+  }
+
+  function renderList(){
+    const filter = $('list-filter').value;
+    const filterProject = $('list-filter-project').value;
+    const sort = $('list-sort').value;
+    let items = deals.slice();
+    if(filter !== 'all') items = items.filter(d => d.site === filter);
+    if(filterProject !== 'all') items = items.filter(d => d.projectSite === filterProject);
+
+    items.sort((a,b)=>{
+      if(sort === 'buy-asc') return (a.buy||'').localeCompare(b.buy||'');
+      if(sort === 'profit-desc') return dealTotal(b) - dealTotal(a);
+      return (b.buy||'').localeCompare(a.buy||'');
+    });
+
+    const c = $('list-container');
+    if(items.length===0){
+      c.innerHTML = '<div class="empty"><div class="glyph">帳</div>まだ記録がありません<br>「記録」タブから追加しましょう</div>';
+      return;
+    }
+
+    c.innerHTML = items.map(d=>{
+      const total = dealTotal(d);
+      const cls = total >= 0 ? 'pos' : 'neg';
+      const color = total >= 0 ? 'var(--profit)' : 'var(--loss)';
+      const complete = isComplete(d);
+      const dates = [d.notice && ('案内 '+fmtDate(d.notice)), d.buy && ('購入 '+fmtDate(d.buy)), d.arrive && ('到着 '+fmtDate(d.arrive))].filter(Boolean).join(' ・ ');
+      return `<div class="deal${complete ? ' complete':''}" data-id="${d.id}">
+        ${d.projectSite ? `<span class="project-tag">${d.projectSite}</span>` : ''}
+        ${d.site ? `<span class="site-tag">${d.site}</span>` : ''}
+        ${complete ? `<span class="done-tag">完了</span>` : ''}
+        <div class="name">${d.name || '（商品名未入力）'}</div>
+        <div class="dates">${dates || '日付未入力'}</div>
+        <div class="profit-badge" style="color:${color};">${yen(total)}</div>
+        <div class="nums">
+          ${d.list ? `<span>提示額 <b>${yen(d.list)}</b></span>`:''}
+          ${d.actual ? `<span>実質額 <b>${yen(d.actual)}</b></span>`:''}
+          ${d.commission ? `<span>手数料 <b>${yen(d.commission)}</b></span>`:''}
+          ${d.shipping ? `<span>送料 <b>${yen(d.shipping)}</b></span>`:''}
+          ${d.packing ? `<span>梱包費 <b>${yen(d.packing)}</b></span>`:''}
+          ${d.resale ? `<span>転売益 <b>${yen(d.resale)}</b></span>`:''}
+          ${d.reward ? `<span>報酬 <b>${yen(d.reward)}</b></span>`:''}
+        </div>
+      </div>`;
+    }).join('');
+
+    c.querySelectorAll('.deal').forEach(el=>{
+      el.addEventListener('click', ()=> openEdit(el.dataset.id));
+    });
+  }
+
+  function fmtDate(s){
+    if(!s) return '';
+    const [y,m,d] = s.split('-');
+    return `${parseInt(m)}/${parseInt(d)}`;
+  }
+
+  function openEdit(id){
+    const d = deals.find(x=>x.id===id);
+    if(!d) return;
+    editingId = id;
+    $('f-name').value = d.name||'';
+    $('f-notice').value = d.notice||'';
+    $('f-buy').value = d.buy||'';
+    $('f-arrive').value = d.arrive||'';
+    $('f-site').value = d.site||'';
+    $('f-project-site').value = d.projectSite||'';
+    $('f-list').value = d.list||'';
+    $('f-actual').value = d.actual||'';
+    $('f-commission').value = d.commission||'';
+    $('f-shipping').value = d.shipping||'';
+    $('f-packing').value = d.packing||'';
+    $('f-resale').value = d.resale||'';
+    $('f-reward').value = d.reward||'';
+    $('f-note').value = d.note||'';
+    computeTotal();
+    $('btn-save').textContent = '更新する';
+    goToInput();
+
+    // add delete option once
+    if(!$('btn-delete')){
+      const b = document.createElement('button');
+      b.id='btn-delete'; b.type='button'; b.className='btn btn-danger';
+      b.textContent='削除';
+      b.style.width='100%'; b.style.marginTop='10px';
+      b.addEventListener('click', async ()=>{
+        if(confirm('この記録を削除しますか？')){
+          deals = deals.filter(x=>x.id!==editingId);
+          await saveDeals();
+          toast('削除しました');
+          clearForm();
+          b.remove();
+          renderList(); renderSummary();
+        }
+      });
+      $('view-input').querySelector('.card').appendChild(b);
+    }
+  }
+
+  $('list-filter').addEventListener('change', renderList);
+  $('list-filter-project').addEventListener('change', renderList);
+  $('list-sort').addEventListener('change', renderList);
+
+  // ---------- summary ----------
+  function renderSummary(){
+    let commission=0, shipping=0, packing=0, resale=0, reward=0, total=0;
+    const byMonth = {};
+    deals.forEach(d=>{
+      const c = parseFloat(d.commission)||0, s = parseFloat(d.shipping)||0, p = parseFloat(d.packing)||0;
+      const r = parseFloat(d.resale)||0, rw = parseFloat(d.reward)||0;
+      commission += c; shipping += s; packing += p; resale += r; reward += rw;
+      total += (r+rw-c-s-p);
+      const key = (d.buy || d.notice || '').slice(0,7);
+      if(key){
+        byMonth[key] = (byMonth[key]||0) + (r+rw-c-s-p);
+      }
+    });
+    $('s-count').textContent = deals.length + '件';
+    $('s-commission').textContent = yen(commission);
+    $('s-shipping').textContent = yen(shipping);
+    $('s-packing').textContent = yen(packing);
+    $('s-resale').textContent = yen(resale);
+    $('s-reward').textContent = yen(reward);
+    $('s-total').textContent = yen(total);
+
+    const months = Object.keys(byMonth).sort();
+    const maxAbs = Math.max(1, ...months.map(m=>Math.abs(byMonth[m])));
+    $('month-breakdown').innerHTML = months.length ? months.map(m=>{
+      const v = byMonth[m];
+      const pct = Math.max(4, Math.round(Math.abs(v)/maxAbs*100));
+      const label = m.replace('-','年')+'月';
+      return `<div class="month-row">
+        <div class="m">${label}</div>
+        <div class="bar-bg"><div class="bar" style="width:${pct}%; background:${v>=0?'var(--gold)':'var(--loss)'}"></div></div>
+        <div class="v" style="color:${v>=0?'var(--profit)':'var(--loss)'}">${yen(v)}</div>
+      </div>`;
+    }).join('') : '<div style="color:var(--ink-soft); font-size:13px; padding:6px 0;">データがありません</div>';
+  }
+
+  $('btn-export').addEventListener('click', async ()=>{
+    const header = ['商品名','案内日','購入日','到着日','案件サイト','転売サイト','当初提示額','実質販売額','手数料','送料','梱包費','転売益','レビュー報酬','総利益額','備考'].join('\t');
+    const rows = deals.map(d=>[
+      d.name, d.notice, d.buy, d.arrive, d.projectSite, d.site, d.list, d.actual, d.commission, d.shipping, d.packing, d.resale, d.reward, dealTotal(d), d.note
+    ].join('\t'));
+    const text = [header, ...rows].join('\n');
+    try{
+      await navigator.clipboard.writeText(text);
+      toast('コピーしました。スプレッドシートに貼り付けできます');
+    }catch(e){
+      toast('コピーに失敗しました');
+    }
+  });
+
+  function renderAll(){
+    computeTotal();
+    renderList();
+    renderSummary();
+  }
+
+  loadDeals();
+})();
+</script>
+</body>
+</html>
